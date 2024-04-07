@@ -212,10 +212,9 @@ class Explorer(AbstAgent):
         if self.backtracking_stack.is_empty() and self.x == 0 and self.y == 0:
             # time to wake up the rescuer
             # pass the walls and the victims (here, they're empty)
-            print(len(self.victims))
             print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
             #input(f"{self.NAME}: type [ENTER] to proceed")
-            # self.resc.go_save_victims(self.map, self.victims)
+            self.resc.go_save_victims(self.map, self.victims)
             
             return False
 
