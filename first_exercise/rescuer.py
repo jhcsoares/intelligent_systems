@@ -12,6 +12,7 @@ from vs.abstract_agent import AbstAgent
 from vs.physical_agent import PhysAgent
 from vs.constants import VS
 from abc import ABC, abstractmethod
+from time import sleep
 
 
 ## Classe que define o Agente Rescuer com um plano fixo
@@ -42,6 +43,7 @@ class Rescuer(AbstAgent):
 
     
     def go_save_victims(self, map, victims):
+        
         """ The explorer sends the map containing the walls and
         victims' location. The rescuer becomes ACTIVE. From now,
         the deliberate method is called by the environment"""

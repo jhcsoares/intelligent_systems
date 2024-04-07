@@ -6,6 +6,7 @@ import time
 from vs.environment import Env
 from explorer import Explorer
 from rescuer import Rescuer
+from cluster import Cluster
 
 def main(data_folder_name):
    
@@ -37,8 +38,7 @@ def main(data_folder_name):
 
     # Run the environment simulator
     env.run()
-    
-        
+
 if __name__ == '__main__':
     """ To get data from a different folder than the default called data
     pass it by the argument line"""

@@ -8,6 +8,7 @@ from vs.abstract_agent import AbstAgent
 from vs.constants import VS
 from map import Map
 from time import sleep
+from cluster import Cluster
 
 class Stack:
     def __init__(self):
@@ -34,6 +35,8 @@ class Explorer(AbstAgent):
         super().__init__(env, config_file)
         self.direction = direction
         
+        self.has_finished = False
+
         self.walk_stack = Stack()  # a stack to store the movements
         self.backtracking_stack = Stack()
         self.explored_coordinates = [(0, 0)]
@@ -200,9 +203,6 @@ class Explorer(AbstAgent):
         #print(self.walking_time+self.get_rtime())
         """ The agent chooses the next action. The simulator calls this
         method at each cycle. Must be implemented in every agent"""
-
-        #consumed_time = self.TLIM - self.get_rtime()
-        # if consumed_time < self.get_rtime():
         
         if self.walking_time + 2*self.first_difficulty < self.TLIM/2:
             self.explore()
@@ -214,9 +214,21 @@ class Explorer(AbstAgent):
             # pass the walls and the victims (here, they're empty)
             print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
             #input(f"{self.NAME}: type [ENTER] to proceed")
-            self.resc.go_save_victims(self.map, self.victims)
-            
-            return False
+
+            if not self.has_finished:
+                self.has_finished = True
+
+                Cluster.deliver_data(self.map.map_data, self.victims)
+                Cluster.maps_received += 1
+
+            if Cluster.maps_received == 4:
+                Cluster.k_means()
+                self.map.map_data = Cluster.unified_map
+                print(self.victims)
+                self.resc.go_save_victims(self.map, self.victims)
+                return False
+
+            return True
 
         self.come_back()
         return True
