@@ -224,7 +224,7 @@ class Explorer(AbstAgent):
             if Cluster.maps_received == 4:
                 Cluster.k_means()
                 self.map.map_data = Cluster.unified_map
-                print(self.victims)
+                Cluster.transfer_data()
                 self.resc.go_save_victims(self.map, self.victims)
                 return False
 

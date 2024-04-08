@@ -30,10 +30,10 @@ import math
 import csv
 
 # Coordinates of cluster and sequence files are absolute to the base position?
-ABS_COORDINATES = True
+ABS_COORDINATES = False
 
 # Input files and folders
-data_folder = "./datasets/data_42v_20x20"
+data_folder = "./datasets/data_225v_100x80"
 env_file = "env_config.txt"
 obst_file = "env_obst.txt"
 victims_file = "env_victims.txt"
