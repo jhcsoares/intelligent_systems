@@ -9,6 +9,7 @@ from vs.constants import VS
 from map import Map
 from time import sleep
 from cluster import Cluster
+from genetic_algorithm import GeneticAlgorithm
 
 class Stack:
     def __init__(self):
@@ -25,6 +26,9 @@ class Stack:
         return len(self.items) == 0
 
 class Explorer(AbstAgent):
+    victims_groups = None
+    victims_groups_index = 1
+
     def __init__(self, env, config_file, resc, direction=None):
         """ Construtor do agente random on-line
         @param env: a reference to the environment 
@@ -135,7 +139,7 @@ class Explorer(AbstAgent):
                 if seq != VS.NO_VICTIM:
                     vs = self.read_vital_signals()
                     self.victims[vs[0]] = ((self.x, self.y), vs)
-                    print(f"{self.NAME} Victim found at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
+                    #print(f"{self.NAME} Victim found at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
                     #print(f"{self.NAME} Seq: {seq} Vital signals: {vs}")
                 
                 rtime_aft = self.get_rtime()
@@ -173,7 +177,7 @@ class Explorer(AbstAgent):
             result = self.walk(dx, dy)
 
             if result == VS.BUMPED:
-                print(f"{self.NAME}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
+                # print(f"{self.NAME}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
                 return
             
             if result == VS.EXECUTED:
@@ -197,10 +201,8 @@ class Explorer(AbstAgent):
                     difficulty = difficulty / self.COST_LINE
                 else:
                     difficulty = difficulty / self.COST_DIAG
-
+    
     def deliberate(self) -> bool:
-        #print(f"walking_time: {self.walking_time} / rtime: {self.get_rtime()}")
-        #print(self.walking_time+self.get_rtime())
         """ The agent chooses the next action. The simulator calls this
         method at each cycle. Must be implemented in every agent"""
         
@@ -212,7 +214,7 @@ class Explorer(AbstAgent):
         if self.backtracking_stack.is_empty() and self.x == 0 and self.y == 0:
             # time to wake up the rescuer
             # pass the walls and the victims (here, they're empty)
-            print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
+            #print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
             #input(f"{self.NAME}: type [ENTER] to proceed")
 
             if not self.has_finished:
@@ -225,10 +227,27 @@ class Explorer(AbstAgent):
                 Cluster.k_means()
                 self.map.map_data = Cluster.unified_map
                 Cluster.transfer_data()
-                self.resc.go_save_victims(self.map, self.victims)
+
+                if not GeneticAlgorithm.has_runned:
+                    GeneticAlgorithm.has_runned = True
+
+                    Explorer.victims_groups = GeneticAlgorithm.execute(
+                        population_size=6,
+                        generations=200,
+                        crossover_rate=0.8,
+                        mutation_rate=0.04,
+                        victims_unified_map=Cluster.unified_victims_map
+                    )
+                    
+
+                #passar no self.victims o cluster responsavel ja pelo AG
+                self.resc.go_save_victims(self.map, Explorer.victims_groups[Explorer.victims_groups_index])
+                Explorer.victims_groups_index+=1
+    
                 return False
 
             return True
 
         self.come_back()
         return True
+

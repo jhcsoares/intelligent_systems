@@ -329,11 +329,11 @@ class Env:
                 print("ENV: no active or idle agent scheduled for execution... terminating")
                 if self.dic["STATS_PER_AG"] == 1:
                     print("RESULTS PER AGENT")
-                    self.print_results()
+                    #self.print_results()
 
                 if self.dic["STATS_ALL_AG"] == 1:
                     print("\n--------------")
-                    self.print_acum_results()
+                    #self.print_acum_results()
                     
                 input("ENV: Tecle qualquer coisa para encerrar >>")
                 running = False

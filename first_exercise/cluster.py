@@ -6,7 +6,7 @@ class Cluster:
     maps_received = 0
     has_clusterized = False
     unified_map = {}
-    unified_map_victims = {}
+    unified_victims_map = {}
     filtered_map = {}
     final_centroids = {0: set(),
                        1: set(),
@@ -105,7 +105,7 @@ class Cluster:
     @classmethod
     def deliver_data(cls, map, victims):
         cls.unified_map.update(map)
-        cls.unified_map_victims.update(victims)
+        cls.unified_victims_map.update(victims)
     
     @classmethod
     def __write_data(cls, victim_id, x, y, severity, cluster_id):
@@ -132,10 +132,10 @@ class Cluster:
         for coordinate in cluster.keys():
             victim_id = cluster[coordinate][1]
 
-            if victim_id in cls.unified_map_victims.keys():
+            if victim_id in cls.unified_victims_map.keys():
                 x = coordinate[0]
                 y = coordinate[1]
-                severity = cls.unified_map_victims[victim_id][1][1]
+                severity = cls.unified_victims_map[victim_id][1][1]
                 cluster_id = cls.cluster_index 
 
                 cls.__write_data(victim_id, x, y, severity, cluster_id)
