@@ -7,9 +7,9 @@
 from vs.abstract_agent import AbstAgent
 from vs.constants import VS
 from map import Map
-from time import sleep
 from cluster import Cluster
 from genetic_algorithm import GeneticAlgorithm
+
 
 class Stack:
     def __init__(self):
@@ -25,20 +25,21 @@ class Stack:
     def is_empty(self):
         return len(self.items) == 0
 
+
 class Explorer(AbstAgent):
     victims_groups = None
-    victims_groups_index = 1
+    victims_groups_index = 0
 
     def __init__(self, env, config_file, resc, direction=None):
-        """ Construtor do agente random on-line
-        @param env: a reference to the environment 
+        """Construtor do agente random on-line
+        @param env: a reference to the environment
         @param config_file: the absolute path to the explorer's config file
         @param resc: a reference to the rescuer agent to invoke when exploration finishes
         """
 
         super().__init__(env, config_file)
         self.direction = direction
-        
+
         self.has_finished = False
 
         self.walk_stack = Stack()  # a stack to store the movements
@@ -49,16 +50,16 @@ class Explorer(AbstAgent):
         self.first_difficulty = 0
 
         self.set_state(VS.ACTIVE)  # explorer is active since the begin
-        self.resc = resc           # reference to the rescuer agent
-        self.x = 0                 # current x position relative to the origin 0
-        self.y = 0                 # current y position relative to the origin 0
-        self.map = Map()           # create a map for representing the environment
-        self.victims = {}          # a dictionary of found victims: (seq): ((x,y), [<vs>])
-                                   # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
+        self.resc = resc  # reference to the rescuer agent
+        self.x = 0  # current x position relative to the origin 0
+        self.y = 0  # current y position relative to the origin 0
+        self.map = Map()  # create a map for representing the environment
+        self.victims = {}  # a dictionary of found victims: (seq): ((x,y), [<vs>])
+        # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
 
         # put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
-    
+
     def get_explored_coordinates(self):
         return self.explored_coordinates
 
@@ -76,7 +77,7 @@ class Explorer(AbstAgent):
             delta = 4
         elif self.direction == "l":
             delta = 6
-        
+
         return delta
 
     def set_walk_stack(self):
@@ -91,17 +92,20 @@ class Explorer(AbstAgent):
 
         for i in range(0, 8):
             index = (i + delta) % 8
-            
+
             position = Explorer.AC_INCR[index]
 
             coordinates = (position[0] + self.x, position[1] + self.y)
 
-            if obstacles[index] == VS.CLEAR and coordinates not in explored_coordinates_list:
+            if (
+                obstacles[index] == VS.CLEAR
+                and coordinates not in explored_coordinates_list
+            ):
                 self.walk_stack.push(coordinates)
                 has_pushed = True
-        
+
         return has_pushed
-        
+
     def explore(self):
         has_pushed = self.set_walk_stack()
 
@@ -109,7 +113,7 @@ class Explorer(AbstAgent):
             xf, yf = self.walk_stack.pop()
             dx = xf - self.x
             dy = yf - self.y
-            
+
             self.backtracking_stack.push((dx, dy))
             self.add_explored_coordinate((xf, yf))
 
@@ -121,32 +125,37 @@ class Explorer(AbstAgent):
             # Should never bump, but for safe functionning let's test
             if result == VS.BUMPED:
                 # update the map with the wall
-                self.map.add((self.x + dx, self.y + dy), VS.OBST_WALL, VS.NO_VICTIM, self.check_walls_and_lim())
-                #print(f"{self.NAME}: Wall or grid limit reached at ({self.x + dx}, {self.y + dy})")
+                self.map.add(
+                    (self.x + dx, self.y + dy),
+                    VS.OBST_WALL,
+                    VS.NO_VICTIM,
+                    self.check_walls_and_lim(),
+                )
+                # print(f"{self.NAME}: Wall or grid limit reached at ({self.x + dx}, {self.y + dy})")
 
             if result == VS.EXECUTED:
                 # check for victim returns -1 if there is no victim or the sequential
                 # the sequential number of a found victim
 
-                #self.walk_stack.push((dx, dy))
+                # self.walk_stack.push((dx, dy))
 
                 # update the agent's position relative to the origin
                 self.x += dx
-                self.y += dy          
+                self.y += dy
 
                 # Check for victims
                 seq = self.check_for_victim()
                 if seq != VS.NO_VICTIM:
                     vs = self.read_vital_signals()
                     self.victims[vs[0]] = ((self.x, self.y), vs)
-                    #print(f"{self.NAME} Victim found at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
-                    #print(f"{self.NAME} Seq: {seq} Vital signals: {vs}")
-                
+                    # print(f"{self.NAME} Victim found at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
+                    # print(f"{self.NAME} Seq: {seq} Vital signals: {vs}")
+
                 rtime_aft = self.get_rtime()
 
                 # Calculates the difficulty of the visited cell
-                difficulty = (rtime_bef - rtime_aft)
-                
+                difficulty = rtime_bef - rtime_aft
+
                 if not self.first_difficulty:
                     self.first_difficulty = difficulty
 
@@ -156,20 +165,22 @@ class Explorer(AbstAgent):
                     difficulty = difficulty / self.COST_LINE
                 else:
                     difficulty = difficulty / self.COST_DIAG
-                
+
                 # Update the map with the new cell
-                self.map.add((self.x, self.y), difficulty, seq, self.check_walls_and_lim())
-                #print(f"{self.NAME}:at ({self.x}, {self.y}), diffic: {difficulty:.2f} vict: {seq} rtime: {self.get_rtime()}")
+                self.map.add(
+                    (self.x, self.y), difficulty, seq, self.check_walls_and_lim()
+                )
+                # print(f"{self.NAME}:at ({self.x}, {self.y}), diffic: {difficulty:.2f} vict: {seq} rtime: {self.get_rtime()}")
 
         else:
             self.come_back()
 
         return
-    
+
     def come_back(self):
         if not self.backtracking_stack.is_empty():
             dx, dy = self.backtracking_stack.pop()
-            dx = dx * -1 
+            dx = dx * -1
             dy = dy * -1
 
             rtime_bef = self.get_rtime()
@@ -179,18 +190,18 @@ class Explorer(AbstAgent):
             if result == VS.BUMPED:
                 # print(f"{self.NAME}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
                 return
-            
+
             if result == VS.EXECUTED:
                 # update the agent's position relative to the origin
-                
-                #print(f"{self.NAME}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
+
+                # print(f"{self.NAME}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
                 self.x += dx
                 self.y += dy
 
                 rtime_aft = self.get_rtime()
 
                 # Calculates the difficulty of the visited cell
-                difficulty = (rtime_bef - rtime_aft)
+                difficulty = rtime_bef - rtime_aft
 
                 if not self.first_difficulty:
                     self.first_difficulty = difficulty
@@ -201,12 +212,12 @@ class Explorer(AbstAgent):
                     difficulty = difficulty / self.COST_LINE
                 else:
                     difficulty = difficulty / self.COST_DIAG
-    
+
     def deliberate(self) -> bool:
-        """ The agent chooses the next action. The simulator calls this
+        """The agent chooses the next action. The simulator calls this
         method at each cycle. Must be implemented in every agent"""
-        
-        if self.walking_time + 2*self.first_difficulty < self.TLIM/2:
+
+        if self.walking_time + 2 * self.first_difficulty < self.TLIM / 2:
             self.explore()
             return True
 
@@ -214,8 +225,8 @@ class Explorer(AbstAgent):
         if self.backtracking_stack.is_empty() and self.x == 0 and self.y == 0:
             # time to wake up the rescuer
             # pass the walls and the victims (here, they're empty)
-            #print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
-            #input(f"{self.NAME}: type [ENTER] to proceed")
+            # print(f"{self.NAME}: rtime {self.get_rtime()}, invoking the rescuer")
+            # input(f"{self.NAME}: type [ENTER] to proceed")
 
             if not self.has_finished:
                 self.has_finished = True
@@ -236,18 +247,18 @@ class Explorer(AbstAgent):
                         generations=200,
                         crossover_rate=0.8,
                         mutation_rate=0.04,
-                        victims_unified_map=Cluster.unified_victims_map
+                        victims_unified_map=Cluster.unified_victims_map,
                     )
-                    
 
-                #passar no self.victims o cluster responsavel ja pelo AG
-                self.resc.go_save_victims(self.map, Explorer.victims_groups[Explorer.victims_groups_index])
-                Explorer.victims_groups_index+=1
-    
+                # passar no self.victims o cluster responsavel ja pelo AG
+                self.resc.go_save_victims(
+                    self.map, Explorer.victims_groups[Explorer.victims_groups_index]
+                )
+                Explorer.victims_groups_index += 1
+
                 return False
 
             return True
 
         self.come_back()
         return True
-
