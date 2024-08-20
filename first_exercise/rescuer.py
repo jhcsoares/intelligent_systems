@@ -6,12 +6,31 @@
 
 import os
 import random
+import math
 from map import Map
 from vs.abstract_agent import AbstAgent
 from vs.physical_agent import PhysAgent
 from vs.constants import VS
 from abc import ABC, abstractmethod
 from time import sleep
+import heapq
+
+
+class Node:
+    def __init__(self, position, parent=None):
+        self.position = position
+        self.parent = parent
+        self.g = 0  # Distance from start node
+        self.h = 0  # Heuristic - estimated distance from current node to end node
+        self.f = 0  # Total cost (g + h)
+        self.dx = 0
+        self.dy = 0
+        self.vic_seq = -1
+        self.difficulty = 0
+        self.step_cost = 0
+
+    def __lt__(self, other):
+        return self.f < other.f
 
 
 ## Classe que define o Agente Rescuer com um plano fixo
@@ -31,6 +50,8 @@ class Rescuer(AbstAgent):
         self.plan_y = 0  # the y position of the rescuer during the planning phase
         self.plan_visited = set()  # positions already planned to be visited
         self.plan_rtime = self.TLIM  # the remaing time during the planning phase
+        self.comeback_plan_walk_time = 0.0
+        self.comeback_plan = []
         self.plan_walk_time = 0.0  # previewed time to walk during rescue
         self.x = 0  # the current x position of the rescuer when executing the plan
         self.y = 0  # the current y position of the rescuer when executing the plan
@@ -39,21 +60,17 @@ class Rescuer(AbstAgent):
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
 
-    def go_save_victims(self, map, victims):
+    def go_save_victims(self, map, victims_sequence, unified_victims_map):
         """The explorer sends the map containing the walls and
         victims' location. The rescuer becomes ACTIVE. From now,
         the deliberate method is called by the environment"""
 
         # print(f"\n\n*** R E S C U E R ***")
-        self.map = map
-        # print(f"{self.NAME} Map received from the explorer")
-        # self.map.draw()
-
-        # print()
-        # print(f"{self.NAME} List of found victims received from the explorer")
-        self.victims = victims
-
-        print(self.map)
+        self.map = map  # coordinate as key
+        self.victims = victims_sequence
+        self.unified_victims_map = (
+            unified_victims_map  # victim_id: unified_victims_map[1]
+        )
 
         # print the found victims - you may comment out
         # for seq, data in self.victims.items():
@@ -64,23 +81,200 @@ class Rescuer(AbstAgent):
         # print(f"{self.NAME} time limit to rescue {self.plan_rtime}")
 
         self.__planner()
-        # print(f"{self.NAME} PLAN")
-        i = 1
-        self.plan_x = 0
-        self.plan_y = 0
-        for a in self.plan:
-            self.plan_x += a[0]
-            self.plan_y += a[1]
-            # print(f"{self.NAME} {i}) dxy=({a[0]}, {a[1]}) vic: a[2] => at({self.plan_x}, {self.plan_y})")
-            i += 1
-
-        # print(f"{self.NAME} END OF PLAN")
 
         self.set_state(VS.ACTIVE)
 
-    def __a_star(self, actions_res):
+    def a_star(self):
+        open_list = []
+        closed_dict = {}
+
+        start_position = (0, 0)
+        start_node = Node(start_position)
+        heapq.heappush(open_list, start_node)
+
+        victim_location = self.unified_victims_map[self.victims.pop(0)][0]
+        end_position = victim_location
+
+        while open_list:
+            current_node = heapq.heappop(open_list)
+            current_position = current_node.position
+
+            if current_position in closed_dict:
+                continue
+
+            closed_dict[current_position] = current_node.g
+
+            if current_position == end_position:
+                reverse_node = current_node
+                reverse_path = []
+                while reverse_node:
+                    if reverse_node.vic_seq == VS.NO_VICTIM:
+                        reverse_path.append((reverse_node.dx, reverse_node.dy, False))
+                        self.plan_walk_time += reverse_node.step_cost
+                        self.plan_rtime -= reverse_node.step_cost
+                    else:
+                        reverse_path.append((reverse_node.dx, reverse_node.dy, True))
+                        self.plan_walk_time += (
+                            reverse_node.step_cost + self.COST_FIRST_AID
+                        )
+                        self.plan_rtime -= reverse_node.step_cost
+
+                    reverse_node = reverse_node.parent
+
+                self.plan_walk_time += current_node.g
+
+                return_path = self.calculate_return_path(current_node.position)
+
+                if return_path:
+                    if self.plan_walk_time + self.comeback_plan_walk_time >= self.TLIM:
+                        self.plan.extend(self.comeback_plan)
+                        return
+                    else:
+                        self.plan.extend(reverse_path[::-1])
+                        self.comeback_plan = return_path
+
+                if not self.victims:
+                    self.plan.extend(self.comeback_plan)
+                    return
+
+                victim_location = self.unified_victims_map[self.victims.pop(0)][0]
+                end_position = victim_location
+
+                open_list = []
+                closed_dict = {}
+                heapq.heappush(open_list, Node(current_node.position))
+                continue
+
+            _, _, actions_res = self.map.get(current_position)
+
+            for i, ar in enumerate(actions_res):
+                if ar != VS.CLEAR:
+                    continue
+
+                dx, dy = Rescuer.AC_INCR[i]
+                neighbor_position = (
+                    current_position[0] + dx,
+                    current_position[1] + dy,
+                )
+
+                if not self.map.get(neighbor_position):
+                    continue
+
+                difficulty, vic_seq, _ = self.map.get(neighbor_position)
+
+                step_cost = (
+                    self.COST_LINE * difficulty
+                    if dx == 0 or dy == 0
+                    else self.COST_DIAG * difficulty
+                )
+
+                g_cost = current_node.g + step_cost
+                if (
+                    neighbor_position in closed_dict
+                    and g_cost >= closed_dict[neighbor_position]
+                ):
+                    continue
+
+                h_cost = (neighbor_position[0] - end_position[0]) ** 2 + (
+                    neighbor_position[1] - end_position[1]
+                ) ** 2
+                f_cost = g_cost + h_cost
+
+                new_node = Node(neighbor_position, current_node)
+                new_node.g = g_cost
+                new_node.h = h_cost
+                new_node.f = f_cost
+                new_node.dx = dx
+                new_node.dy = dy
+                new_node.difficulty = difficulty
+                new_node.vic_seq = vic_seq
+                new_node.step_cost = step_cost
+
+                heapq.heappush(open_list, new_node)
+
+        return None  # No path found
+
+    def calculate_return_path(self, start_position):
+        """A* search from start_position to (0, 0)"""
+        self.comeback_plan_walk_time = 0.0
+
+        open_list = []
+        closed_dict = {}
+
+        start_node = Node(start_position)
+        heapq.heappush(open_list, start_node)
+
+        end_position = (0, 0)
+
+        while open_list:
+            current_node = heapq.heappop(open_list)
+            current_position = current_node.position
+
+            if current_position in closed_dict:
+                continue
+
+            closed_dict[current_position] = current_node.g
+
+            if current_position == end_position:
+                reverse_node = current_node
+                reverse_path = []
+                while reverse_node:
+                    self.comeback_plan_walk_time += reverse_node.step_cost
+                    reverse_path.append((reverse_node.dx, reverse_node.dy, False))
+                    reverse_node = reverse_node.parent
+                return reverse_path[::-1]
+
+            _, _, actions_res = self.map.get(current_position)
+
+            for i, ar in enumerate(actions_res):
+                if ar != VS.CLEAR:
+                    continue
+
+                dx, dy = Rescuer.AC_INCR[i]
+                neighbor_position = (
+                    current_position[0] + dx,
+                    current_position[1] + dy,
+                )
+
+                if not self.map.get(neighbor_position):
+                    continue
+
+                difficulty, _, _ = self.map.get(neighbor_position)
+
+                step_cost = (
+                    self.COST_LINE * difficulty
+                    if dx == 0 or dy == 0
+                    else self.COST_DIAG * difficulty
+                )
+
+                g_cost = current_node.g + step_cost
+                if (
+                    neighbor_position in closed_dict
+                    and g_cost >= closed_dict[neighbor_position]
+                ):
+                    continue
+
+                h_cost = (neighbor_position[0] - end_position[0]) ** 2 + (
+                    neighbor_position[1] - end_position[1]
+                ) ** 2
+                f_cost = g_cost + h_cost
+
+                new_node = Node(neighbor_position, current_node)
+                new_node.g = g_cost
+                new_node.h = h_cost
+                new_node.f = f_cost
+                new_node.dx = dx
+                new_node.dy = dy
+                new_node.step_cost = step_cost
+
+                heapq.heappush(open_list, new_node)
+
+        return None  # No path found
+
+    def __depth_search(self, actions_res):
         enough_time = True
         ##print(f"\n{self.NAME} actions results: {actions_res}")
+
         for i, ar in enumerate(actions_res):
             if ar != VS.CLEAR:
                 ##print(f"{self.NAME} {i} not clear")
@@ -143,7 +337,7 @@ class Rescuer(AbstAgent):
 
             # let's see what the agent can do in the next position
             if enough_time:
-                self.__a_star(
+                self.__depth_search(
                     self.map.get((self.plan_x, self.plan_y))[2]
                 )  # actions results
             else:
@@ -165,23 +359,24 @@ class Rescuer(AbstAgent):
         # Besides, it has a flag indicating that a first-aid kit must be delivered when the move is completed.
         # For instance (0,1,True) means the agent walk to (x+0,y+1) and after walking, it leaves the kit.
 
-        self.plan_visited.add(
-            (0, 0)
-        )  # always start from the base, so it is already visited
-        difficulty, vic_seq, actions_res = self.map.get((0, 0))
-        self.__a_star(actions_res)
+        self.a_star()
+        # self.plan_visited.add(
+        #     (0, 0)
+        # )  # always start from the base, so it is already visited
+        # difficulty, vic_seq, actions_res = self.map.get((0, 0))
+        # self.__depth_search(actions_res)
 
         # push actions into the plan to come back to the base
         if self.plan == []:
             return
 
-        come_back_plan = []
+        # come_back_plan = []
 
-        for a in reversed(self.plan):
-            # triple: dx, dy, no victim - when coming back do not rescue any victim
-            come_back_plan.append((a[0] * -1, a[1] * -1, False))
+        # for a in reversed(self.plan):
+        #     # triple: dx, dy, no victim - when coming back do not rescue any victim
+        #     come_back_plan.append((a[0] * -1, a[1] * -1, False))
 
-        self.plan = self.plan + come_back_plan
+        # self.plan.extend(come_back_plan)
 
     def deliberate(self) -> bool:
         """This is the choice of the next action. The simulator calls this
@@ -189,15 +384,13 @@ class Rescuer(AbstAgent):
         Must be implemented in every agent
         @return True: there's one or more actions to do
         @return False: there's no more action to do"""
-
+        # sleep(0.25)
         # No more actions to do
         if self.plan == []:  # empty list, no more actions to do
-            # input(f"{self.NAME} has finished the plan [ENTER]")
             return False
 
         # Takes the first action of the plan (walk action) and removes it from the plan
         dx, dy, there_is_vict = self.plan.pop(0)
-        # print(f"{self.NAME} pop dx: {dx} dy: {dy} vict: {there_is_vict}")
 
         # Walk - just one step per deliberation
         walked = self.walk(dx, dy)
@@ -206,20 +399,14 @@ class Rescuer(AbstAgent):
         if walked == VS.EXECUTED:
             self.x += dx
             self.y += dy
-            # print(f"{self.NAME} Walk ok - Rescuer at position ({self.x}, {self.y})")
-            # check if there is a victim at the current position
             if there_is_vict:
                 rescued = self.first_aid()  # True when rescued
                 if rescued:
                     pass
-                    # print(f"{self.NAME} Victim rescued at ({self.x}, {self.y})")
                 else:
                     pass
-                    # print(f"{self.NAME} Plan fail - victim not found at ({self.x}, {self.x})")
+
         else:
             pass
-            # print(f"{self.NAME} Plan fail - walk error - agent at ({self.x}, {self.x})")
-
-        # input(f"{self.NAME} remaining time: {self.get_rtime()} Tecle enter")
 
         return True

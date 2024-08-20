@@ -71,12 +71,20 @@ class Explorer(AbstAgent):
 
         if self.direction == "u":
             delta = 0
+        elif self.direction == "ur":
+            delta = 1
         elif self.direction == "r":
             delta = 2
+        elif self.direction == "dr":
+            delta = 3
         elif self.direction == "d":
             delta = 4
+        elif self.direction == "dl":
+            delta = 5
         elif self.direction == "l":
             delta = 6
+        elif self.direction == "ul":
+            delta = 7
 
         return delta
 
@@ -243,8 +251,8 @@ class Explorer(AbstAgent):
                     GeneticAlgorithm.has_runned = True
 
                     Explorer.victims_groups = GeneticAlgorithm.execute(
-                        population_size=6,
-                        generations=200,
+                        population_size=16,
+                        generations=10000,
                         crossover_rate=0.8,
                         mutation_rate=0.04,
                         victims_unified_map=Cluster.unified_victims_map,
@@ -252,7 +260,9 @@ class Explorer(AbstAgent):
 
                 # passar no self.victims o cluster responsavel ja pelo AG
                 self.resc.go_save_victims(
-                    self.map, Explorer.victims_groups[Explorer.victims_groups_index]
+                    self.map,
+                    Explorer.victims_groups[Explorer.victims_groups_index],
+                    Cluster.unified_victims_map,
                 )
                 Explorer.victims_groups_index += 1
 
