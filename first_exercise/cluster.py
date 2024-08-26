@@ -12,7 +12,15 @@ class Cluster:
                        1: set(),
                        2: set(),
                        3: set()}
+    clusters = {
+        0: {},
+        1: {},
+        2: {},
+        3: {}
+    }
+
     cluster_index = -1
+    get_cluster_index = -1
     
     @classmethod
     def k_means(cls):
@@ -97,6 +105,11 @@ class Cluster:
         return cls.final_centroids[cls.cluster_index]
     
     @classmethod
+    def get_cluster(cls):
+        cls.get_cluster_index += 1
+        return cls.clusters[cls.cluster_index]
+    
+    @classmethod
     def __filter_map(cls):
         for key in cls.unified_map.keys():
             if cls.unified_map[key][1] != VS.NO_VICTIM:
@@ -106,7 +119,12 @@ class Cluster:
     def deliver_data(cls, map, victims):
         cls.unified_map.update(map)
         cls.unified_victims_map.update(victims)
-    
+        
+        for index in range(0, 4):
+            if not cls.clusters[index]:
+                cls.clusters[index].update(victims)
+                break 
+
     @classmethod
     def __write_data(cls, victim_id, x, y, severity, cluster_id):
         with open("clusters/cluster" + str(cls.cluster_index) + ".txt", "a") as file:
@@ -128,7 +146,7 @@ class Cluster:
     @classmethod
     def transfer_data(cls):
         cluster = cls.__get_clusters()
-
+  
         for coordinate in cluster.keys():
             victim_id = cluster[coordinate][1]
 
