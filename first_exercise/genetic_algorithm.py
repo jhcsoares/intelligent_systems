@@ -1,5 +1,8 @@
 import random
 import math
+import csv
+
+from neural_network import NeuralNetwork
 
 
 class GeneticAlgorithm:
@@ -32,7 +35,7 @@ class GeneticAlgorithm:
             math.pow(coordinates[0], 2) + math.pow(coordinates[1], 2)
         )
 
-        return 1 / euclidian_distance
+        return 1 / (euclidian_distance * victim_data[1][6])
 
     @classmethod
     def __population_rating(cls, population_data_dict: dict) -> None:
@@ -207,28 +210,34 @@ class GeneticAlgorithm:
             best_fitness_value_index
         ]
 
-        result = {0: [], 1: [], 2: [], 3: []}
+        return final_population
 
-        current_list_index = 0
-        distribute_one_by_one = False
+    @classmethod
+    def __create_cluster_file(cls):
+        with open("clusters_classification/cluster" + str(cls.cluster_id) + ".csv", "w") as file:
+            writer = csv.writer(file)
+            writer.writerow(["id", "qpa", "pulse", "respiratory_frequency", "gravity_class"])
+ 
+            for id, data in cls.victims_unified_map.items():
+                writer.writerow([id, data[1][3], data[1][4], data[1][5], 0])
+    
+    @classmethod
+    def __classificate_cluster(cls):
+        NeuralNetwork.predict("clusters_classification/cluster" + str(cls.cluster_id) + ".csv") 
 
-        for index in range(1, len(final_population) + 1):
-            if not distribute_one_by_one:
-                if index % (int(len(final_population) / 4)) == 0:
-                    current_list_index += 1
+    @classmethod
+    def __add_classification(cls):
+        with open("clusters_classification/cluster" + str(cls.cluster_id) + ".csv", "r") as file:
+            for line in file:
+                id = line.strip().split(",")[0]
 
-                    if current_list_index == 4:
-                        current_list_index = 0
-                        distribute_one_by_one = True
+                if id == "id":
+                    continue
 
-                else:
-                    result[current_list_index].append(final_population[index - 1])
+                id = int(id)
+                classification = int(line.strip().split(",")[4])
 
-            else:
-                result[current_list_index].append(final_population[index - 1])
-                current_list_index = (current_list_index + 1) % 4
-
-        return result
+                cls.victims_unified_map[id][1].append(classification)
 
     @classmethod
     def execute(
@@ -238,6 +247,7 @@ class GeneticAlgorithm:
         crossover_rate: float,
         mutation_rate: float,
         victims_unified_map,
+        cluster_id: int
     ) -> None:
 
         cls.population_size = population_size
@@ -257,6 +267,11 @@ class GeneticAlgorithm:
             },
         }
         cls.victims_unified_map = victims_unified_map
+        cls.cluster_id = cluster_id
+    
+        cls.__create_cluster_file()
+        cls.__classificate_cluster()
+        cls.__add_classification()
 
         cls.__generate_first_population()
 

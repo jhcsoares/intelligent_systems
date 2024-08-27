@@ -135,14 +135,13 @@ class Cluster:
                 str(severity) + "," +
                 str(cluster_id) + "\n"
             )
-    
                     
     @classmethod
     def __clear_data(cls):
         files = os.listdir("clusters")
         for file in files:
             os.remove("clusters/" + file)     
-
+            
     @classmethod
     def transfer_data(cls):
         cluster = cls.__get_clusters()

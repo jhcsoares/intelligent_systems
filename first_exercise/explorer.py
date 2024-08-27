@@ -27,8 +27,7 @@ class Stack:
 
 
 class Explorer(AbstAgent):
-    victims_groups = None
-    victims_groups_index = 0
+    cluster_id = 0
 
     def __init__(self, env, config_file, resc, direction=None):
         """Construtor do agente random on-line
@@ -221,6 +220,15 @@ class Explorer(AbstAgent):
                 else:
                     difficulty = difficulty / self.COST_DIAG
 
+    def __extract_cluster_data(self):
+        result = {}
+        with open("clusters/cluster" + str(Explorer.cluster_id) + ".txt", "r") as file:
+            for line in file:
+                id = int(line.strip().split(",")[0])
+                result.update({id:Cluster.unified_victims_map[id]})
+        
+        return result
+
     def deliberate(self) -> bool:
         """The agent chooses the next action. The simulator calls this
         method at each cycle. Must be implemented in every agent"""
@@ -242,24 +250,23 @@ class Explorer(AbstAgent):
                 self.map.map_data = Cluster.unified_map
                 Cluster.transfer_data()
 
-                if not GeneticAlgorithm.has_runned:
-                    GeneticAlgorithm.has_runned = True
+                victims_group = GeneticAlgorithm.execute(
+                    population_size=16,
+                    generations=10000,
+                    crossover_rate=0.8,
+                    mutation_rate=0.04,
+                    victims_unified_map=self.__extract_cluster_data(),
+                    cluster_id=Explorer.cluster_id
+                )
 
-                    Explorer.victims_groups = GeneticAlgorithm.execute(
-                        population_size=16,
-                        generations=10000,
-                        crossover_rate=0.8,
-                        mutation_rate=0.04,
-                        victims_unified_map=Cluster.unified_victims_map,
-                    )
-
-                # passar no self.victims o cluster responsavel ja pelo AG
                 self.resc.go_save_victims(
                     self.map,
-                    Explorer.victims_groups[Explorer.victims_groups_index],
+                    victims_group,
                     Cluster.unified_victims_map,
+                    Explorer.cluster_id
                 )
-                Explorer.victims_groups_index += 1
+
+                Explorer.cluster_id += 1
 
                 return False
 

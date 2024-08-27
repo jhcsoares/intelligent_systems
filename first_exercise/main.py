@@ -17,7 +17,7 @@ def main(data_folder_name):
     data_folder = os.path.abspath(os.path.join(current_folder, data_folder_name))
 
     NeuralNetwork.train()
-    Cart.train()
+    # Cart.train()
 
     # Instantiate the environment
     env = Env(data_folder)
@@ -35,10 +35,10 @@ def main(data_folder_name):
 
     # Explorer needs to know rescuer to send the map
     # that's why rescuer is instatiated before
-    Explorer(env, explorer_file, resc1, "ul")
-    Explorer(env, explorer_file, resc2, "dl")
-    Explorer(env, explorer_file, resc3, "ur")
-    Explorer(env, explorer_file, resc4, "dr")
+    Explorer(env, explorer_file, resc1, "l")
+    Explorer(env, explorer_file, resc2, "r")
+    Explorer(env, explorer_file, resc3, "u")
+    Explorer(env, explorer_file, resc4, "d")
 
     # Run the environment simulator
     env.run()
@@ -50,6 +50,6 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         data_folder_name = sys.argv[1]
     else:
-        data_folder_name = os.path.join("datasets", "data_42v_20x20")
+        data_folder_name = os.path.join("datasets", "data_225v_100x80")
         
     main(data_folder_name)

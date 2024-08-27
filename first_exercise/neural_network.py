@@ -27,12 +27,12 @@ class NeuralNetwork:
         print(f"Accuracy: {accuracy:.2f}")
 
     @classmethod
-    def test(cls):
-        new_data = pd.read_csv('225_env_vital_signals.csv')
+    def predict(cls, file: str):
+        new_data = pd.read_csv(file)
         X_new = new_data[['qpa', 'pulse', 'respiratory_frequency']]  
-        y_true = new_data['gravity_class'] 
         X_new_scaled = cls.scaler.transform(X_new)
         y_pred = cls.model.predict(X_new_scaled)
 
-        accuracy = accuracy_score(y_true, y_pred)
-        print(f"Accuracy: {accuracy:.2f}")
+        # Write the predicted classification back into the file
+        new_data['gravity_class'] = y_pred
+        new_data.to_csv(file, index=False)
