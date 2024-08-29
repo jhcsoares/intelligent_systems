@@ -2,7 +2,7 @@ import random
 import math
 import csv
 
-from neural_network import NeuralNetwork
+from cart import Cart
 
 
 class GeneticAlgorithm:
@@ -13,6 +13,7 @@ class GeneticAlgorithm:
     population_data = None
     victims_unified_map = None
     has_runned = None
+    normalized_values = {}
 
     @classmethod
     def __generate_first_population(cls) -> None:
@@ -29,13 +30,13 @@ class GeneticAlgorithm:
     @classmethod
     def __fitness_function(cls, victim_id: int) -> int:
         victim_data = cls.victims_unified_map[victim_id]
-        coordinates = victim_data[0]
+        gravity_class = victim_data[1][6]
 
-        euclidian_distance = math.sqrt(
-            math.pow(coordinates[0], 2) + math.pow(coordinates[1], 2)
-        )
+        euclidian_distance = cls.normalized_values[victim_id]
 
-        return 1 / (euclidian_distance * victim_data[1][6])
+        normalized_gravity_class = 0.1 + ((gravity_class - 1) / (4 - 1)) * (1 - 0.1)
+    
+        return  (1 / euclidian_distance) + (1 / normalized_gravity_class)
 
     @classmethod
     def __population_rating(cls, population_data_dict: dict) -> None:
@@ -48,7 +49,7 @@ class GeneticAlgorithm:
             evaluation = 0
             for j in range(0, len(victims_sequence_list)):
                 victim_id = victims_sequence_list[j]
-                evaluation += cls.__fitness_function(victim_id) * (j + 1)
+                evaluation += cls.__fitness_function(victim_id) * (1 / (j + 1))
 
             if evaluation < fitness_fix_factor:
                 fitness_fix_factor = evaluation - 1
@@ -223,7 +224,7 @@ class GeneticAlgorithm:
     
     @classmethod
     def __classificate_cluster(cls):
-        NeuralNetwork.predict("clusters_classification/cluster" + str(cls.cluster_id) + ".csv") 
+        Cart.predict("clusters_classification/cluster" + str(cls.cluster_id) + ".csv") 
 
     @classmethod
     def __add_classification(cls):
@@ -238,6 +239,41 @@ class GeneticAlgorithm:
                 classification = int(line.strip().split(",")[4])
 
                 cls.victims_unified_map[id][1].append(classification)
+    
+    @classmethod
+    def __normalize_values(cls):
+        i = 0
+        biggest_euclidian_distance = 0
+        lowest_euclidian_distance = 0
+
+        for id, data in cls.victims_unified_map.items():
+            coordinates = data[0]
+
+            euclidian_distance = math.sqrt(
+                math.pow(coordinates[0], 2) + math.pow(coordinates[1], 2)
+            )
+
+            if i == 0:
+                i = 1
+                biggest_euclidian_distance = euclidian_distance
+                lowest_euclidian_distance = euclidian_distance
+            
+            else:
+                if euclidian_distance > biggest_euclidian_distance:
+                    biggest_euclidian_distance = euclidian_distance
+                if euclidian_distance < lowest_euclidian_distance:
+                    lowest_euclidian_distance = euclidian_distance
+        
+        for id, data in cls.victims_unified_map.items():
+            coordinates = data[0]
+
+            euclidian_distance = math.sqrt(
+                math.pow(coordinates[0], 2) + math.pow(coordinates[1], 2)
+            )
+
+            normalized_euclidian_distance = 0.1 + ((euclidian_distance - lowest_euclidian_distance) / (biggest_euclidian_distance - lowest_euclidian_distance)) * (1 - 0.1)
+            
+            cls.normalized_values.update({id:normalized_euclidian_distance})
 
     @classmethod
     def execute(
@@ -268,10 +304,11 @@ class GeneticAlgorithm:
         }
         cls.victims_unified_map = victims_unified_map
         cls.cluster_id = cluster_id
-    
+
         cls.__create_cluster_file()
         cls.__classificate_cluster()
         cls.__add_classification()
+        cls.__normalize_values()
 
         cls.__generate_first_population()
 

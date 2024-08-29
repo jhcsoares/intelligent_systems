@@ -252,9 +252,9 @@ class Explorer(AbstAgent):
 
                 victims_group = GeneticAlgorithm.execute(
                     population_size=16,
-                    generations=10000,
+                    generations=20000,
                     crossover_rate=0.8,
-                    mutation_rate=0.04,
+                    mutation_rate=0.05,
                     victims_unified_map=self.__extract_cluster_data(),
                     cluster_id=Explorer.cluster_id
                 )
